@@ -1,0 +1,160 @@
+from __future__ import print_function
+import random
+
+from deap import base
+from deap import creator
+from deap import tools
+from deap import algorithms
+creator.create("FitnessM", base.Fitness, weights=(-1.0,))
+creator.create("Individual", list, fitness=creator.FitnessM)
+
+class Job():
+    def __init__(self,id,source,bestfrequency):
+        self.id = id
+        self.resource = source
+        self.best = bestfrequency
+
+class Machine():
+    def __init__(self,id, source,frequency):
+        self.id = id
+        self.source = source
+        self.initalFrequency = frequency
+num = 0
+Joblist =[]
+for i in range(num):
+    j=Job(i,random.randint(10,50),random.randint(1200,2500))
+    print(j.resource,j.best)
+    Joblist.append(j)
+j1 = Job(1,5,1000)
+j2 = Job(2,20,2000)
+j3 = Job(3,15,3000)
+j4 = Job(4,40,2500)
+j5 = Job(5,30,1500)
+j6 = Job(6,25,1800)
+j7 = Job(7,35,1700)
+j8 = Job(8,29,1937)
+j9 = Job(9,47,1354)
+j10= Job(10,35,2119)
+#for i in range (0,5):
+Joblist.append(j1)
+Joblist.append(j2)
+Joblist.append(j3)
+Joblist.append(j4)
+Joblist.append(j5)
+Joblist.append(j6)
+Joblist.append(j7)
+Joblist.append(j8)
+Joblist.append(j9)
+Joblist.append(j10)
+m1 = Machine(0,50,2000)
+m2 = Machine(1,60,1500)
+m3 = Machine(2,50,1700)
+mlist =[m1,m2,m3]
+#num1 =3
+#for i in range(num1):
+   # j=Machine(i,random.randint(10,50),random.randint(1500,2000))
+   # print(j.source,j.initalFrequency)
+    #mlist.append(j)
+toolbox = base.Toolbox()
+toolbox.register("attr_bool", random.randint, 0, len(mlist)-1)
+toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=len(Joblist))
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+
+bit = toolbox.attr_bool()
+ind = toolbox.individual()
+pop = toolbox.population(n=3)
+
+print("bit is of type %s and has value\n%s" % (type(bit), bit))
+print("ind is of type %s and contains %d bits\n%s" % (type(ind), len(ind), ind))
+print("pop is of type %s and contains %d individuals\n%s" % (type(pop), len(pop), pop))
+def transfer(freq,best):
+    normal = 1+(freq-best)/100* 0.1
+    if (normal<0):
+        normal = 0.1
+    return normal
+
+def calPcost(freq):
+    power = ((freq/1000)**3)/10
+    return  power
+
+def DVFS(best,curfre):
+    if(best>curfre):
+        curfre= curfre+1
+        return curfre
+    elif(best==curfre):
+        return curfre
+    else:
+        curfre = curfre - 1
+        return curfre
+
+
+def evalOneMax(individual):
+    sol = individual
+    curmac = []
+    curjob = []
+    curfre = [0 for i in range(len(mlist))]
+    time = [0 for i in range(len(mlist))]
+    for i in range(len(mlist)):
+        curfre[i]=mlist[i].initalFrequency
+    t_interval = 1
+    p_cost = 0
+    for i in range(0, len(sol)):
+        curmac = mlist[individual[i]]
+       # curfre = curmac.initalFrequency
+        curjob = Joblist[i]
+        jobSource = Joblist[i].resource
+        best = curjob.best
+        while (jobSource > 0):
+            # print(jobSource)
+            cur_finish = transfer(best, curfre[curmac.id-1])
+            curfre[curmac.id-1] = DVFS(best, curfre[curmac.id-1])
+            jobSource = jobSource - cur_finish
+            time[curmac.id - 1] = time[curmac.id - 1] + t_interval
+            p_cost = p_cost+calPcost(curfre[curmac.id-1])
+    p_cost = p_cost
+    makespan = 0
+    for i in range(0, len(time)):
+        if (time[i] > makespan):
+            makespan = time[i]
+    fitness = 0
+    fitness =makespan
+    #print(fitness)
+    return (fitness,)
+
+toolbox.register("evaluate", evalOneMax)
+toolbox.register("mate", tools.cxTwoPoint)
+toolbox.register("mutate", tools.mutFlipBit, indpb=0.50)
+toolbox.register("select", tools.selTournament, tournsize=3)
+
+
+def main():
+    import numpy
+
+    pop = toolbox.population(n=50)
+    hof = tools.HallOfFame(1)
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register("avg", numpy.mean)
+    stats.register("min", numpy.min)
+    stats.register("max", numpy.max)
+
+    pop, logbook = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, ngen=50, stats=stats, halloffame=hof,
+                                       verbose=True)
+
+    return pop, logbook, hof
+
+
+
+#if__name__ == "__main__":
+pop, log, hof = main()
+print("Best individual is: %s\nwith fitness: %s" % (hof[0], hof[0].fitness))
+
+import matplotlib.pyplot as plt
+
+gen, avg, min_, max_ = log.select("gen", "avg", "min", "max")
+plt.plot(gen, avg, label="average")
+plt.plot(gen, min_, label="minimum")
+plt.plot(gen, max_, label="maximum")
+plt.xlabel("Generation")
+plt.ylabel("Fitness")
+plt.legend(loc="lower right")
+plt.show()
